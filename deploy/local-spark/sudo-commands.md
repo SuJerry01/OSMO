@@ -19,10 +19,16 @@ sudo /usr/local/bin/k3s-uninstall.sh
 sudo rm -f /usr/local/bin/osmo
 sudo rm -rf /usr/local/osmo
 
-# 3) 清掉 /etc/hosts 裡舊的 registry 那行（保留 quick-start.osmo）
+# 3) 移除舊 Postgres 資料（root-owned bind mount）
+sudo rm -rf /data/osmo
+
+# 4) 清掉 /etc/hosts 裡舊的 registry 那行（保留 quick-start.osmo）
 sudo sed -i '/osmo-registry\.spark\.local/d' /etc/hosts
 grep -i osmo /etc/hosts        # 確認只剩: 127.0.0.1 quick-start.osmo
 ```
+
+> ⚠️ **保留** 本機 `registry` 容器（:5000）—— 它同時存放 gr00t / isaac-lab 鏡像，非 OSMO 專用，不要刪。
+> 裡面殘留的 `osmo/*` 舊鏡像無害，可不理。
 
 > 備註：worker 節點 `spark-758e` 是**另一台實體機**，移除本機 control-plane 後它會變孤兒。
 > 若要清它，需在那台機器上跑 `sudo /usr/local/bin/k3s-agent-uninstall.sh`（本次範圍外）。
