@@ -1,0 +1,52 @@
+# OSMO local KIND cluster (CPU-only) — DGX Spark fallback when nvkind GPU
+# injection fails (KIND 0.32 containerd v2.3.1 config-version vs nvidia-ctk v4 conflict).
+# Brings up the FULL OSMO control plane + data plane; GPU compute added separately.
+# Source: docs/deployment_guide/appendix/deploy_local.rst  (Option B: CPU Workstations)
+# Create with:  kind create cluster --config kind-osmo-cluster-config-cpu.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: osmo
+nodes:
+  - role: control-plane
+  - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "node_group=kai-scheduler"
+  - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "node_group=data"
+    extraMounts:
+      - hostPath: /tmp/localstack-s3
+        containerPath: /var/lib/localstack
+  - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "node_group=service"
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 80
+        protocol: TCP
+  - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "node_group=service"
+  - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          node-labels: "node_group=compute"
