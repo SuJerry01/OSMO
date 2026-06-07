@@ -1,4 +1,0 @@
-# Local-only pre-reset snapshot — may contain old credentials; do not publish.
-_pre_reset_snapshot/
-# Helm chart tarballs fetched at deploy time
-gpu-operator-*.tgz
