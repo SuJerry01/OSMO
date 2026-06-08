@@ -28,7 +28,17 @@ So: **k3s (real nodes) + GPU Operator + OSMO**, not KIND/nvkind/quick-start.
 - KAI Scheduler v0.14.0
 - OSMO control plane (`osmo-minimal`, 12 pods) + backend-operator (`osmo-operator`, 2 pods)
 - Pool `default` **ONLINE**, 2 GPU capacity; storage = in-cluster LocalStack-S3
-- **`verify-hello` workflow COMPLETED** end-to-end (KAI-scheduled to a compute node, images pulled from nvcr.io)
+- **Workflows validated** end-to-end: verify-hello (CPU), verify-gpu (`nvidia-smi`), parallel, gang/KAI, serial+S3 data I/O, templates, host `osmo data` round-trip — all ✅
+
+## Guides
+- [`guides/deploy_guide.md`](./guides/deploy_guide.md) — full deploy/architecture/ops/troubleshooting + supported storage & DBs
+- [`guides/user_guide.md`](./guides/user_guide.md) — how to use OSMO here (CLI, workflows, GPU, data) + feature status, roadmap, deprecations
+
+## Fixes found during validation (baked into the scripts)
+1. `addressing_style: path` on all S3 credentials — LocalStack/MinIO need path-style; without it the bucket
+   became a DNS subdomain and **all workflow data I/O failed**. (`03-configure-osmo.sh`)
+2. `runtimeClassName: nvidia` in the `default_compute` pod template — k3s GPU pods need it. (`03-configure-osmo.sh`)
+3. Host `osmo data` CLI → data credential points at the LocalStack NodePort `http://localhost:30035`. (`03-configure-osmo.sh`)
 
 ## Stages
 

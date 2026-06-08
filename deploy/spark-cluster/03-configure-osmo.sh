@@ -11,7 +11,8 @@ set -euo pipefail
 BASE_URL="${OSMO_URL:-http://localhost:30080}"                                  # how this script reaches the API (gateway NodePort)
 GW_FQDN="http://osmo-gateway.osmo-minimal.svc.cluster.local"                    # in-cluster gateway URL for workflow pods
 S3_ENDPOINT="${S3_ENDPOINT:-s3://osmo}"
-S3_OVERRIDE="${S3_OVERRIDE:-http://localstack-s3.osmo-minimal.svc.cluster.local:4566}"
+S3_OVERRIDE="${S3_OVERRIDE:-http://localstack-s3.osmo-minimal.svc.cluster.local:4566}"   # in-cluster (workflow pods)
+S3_OVERRIDE_HOST="${S3_OVERRIDE_HOST:-http://localhost:30035}"                            # host-reachable NodePort (osmo data CLI)
 S3_KEY_ID="${S3_KEY_ID:-test}"; S3_KEY="${S3_KEY:-test}"; S3_REGION="${S3_REGION:-us-east-1}"
 IMG_LOC="${OSMO_IMAGE_LOCATION:-nvcr.io/nvidia/osmo}"; IMG_TAG="${OSMO_IMAGE_TAG:-latest}"
 REG="nvcr.io"; REG_USER='$oauthtoken'
@@ -23,9 +24,9 @@ say(){ echo "==> $*"; }
 say "workflow config (data/log/app storage + backend images + registry creds)"
 curl -fsS -X PATCH "${H[@]}" "$BASE_URL/api/configs/workflow" -d @- <<JSON >/dev/null
 { "configs_dict": {
-    "workflow_data": { "credential": { "endpoint": "${S3_ENDPOINT}/workflows", "override_url": "${S3_OVERRIDE}", "access_key_id": "${S3_KEY_ID}", "access_key": "${S3_KEY}", "region": "${S3_REGION}" } },
-    "workflow_log":  { "credential": { "endpoint": "${S3_ENDPOINT}/workflows", "override_url": "${S3_OVERRIDE}", "access_key_id": "${S3_KEY_ID}", "access_key": "${S3_KEY}", "region": "${S3_REGION}" } },
-    "workflow_app":  { "credential": { "endpoint": "${S3_ENDPOINT}/apps",      "override_url": "${S3_OVERRIDE}", "access_key_id": "${S3_KEY_ID}", "access_key": "${S3_KEY}", "region": "${S3_REGION}" } },
+    "workflow_data": { "credential": { "endpoint": "${S3_ENDPOINT}/workflows", "override_url": "${S3_OVERRIDE}", "access_key_id": "${S3_KEY_ID}", "access_key": "${S3_KEY}", "region": "${S3_REGION}", "addressing_style": "path" } },
+    "workflow_log":  { "credential": { "endpoint": "${S3_ENDPOINT}/workflows", "override_url": "${S3_OVERRIDE}", "access_key_id": "${S3_KEY_ID}", "access_key": "${S3_KEY}", "region": "${S3_REGION}", "addressing_style": "path" } },
+    "workflow_app":  { "credential": { "endpoint": "${S3_ENDPOINT}/apps",      "override_url": "${S3_OVERRIDE}", "access_key_id": "${S3_KEY_ID}", "access_key": "${S3_KEY}", "region": "${S3_REGION}", "addressing_style": "path" } },
     "backend_images": { "init": "${IMG_LOC}/init-container:${IMG_TAG}", "client": "${IMG_LOC}/client:${IMG_TAG}",
                         "credential": { "registry": "${REG}", "username": "${REG_USER}", "auth": "${REG_PASS}" } },
     "credential_config": { "disable_data_validation": ["s3"] }
@@ -39,7 +40,8 @@ curl -fsS -X PUT "${H[@]}" "$BASE_URL/api/configs/pod_template" -d @- <<'JSON' >
       { "name": "{{USER_CONTAINER_NAME}}", "env": [ { "name": "OSMO_LOGIN_DEV", "value": "true" } ] },
       { "name": "osmo-ctrl",               "env": [ { "name": "OSMO_LOGIN_DEV", "value": "true" } ] }
     ],
-    "nodeSelector": { "node_group": "compute" }
+    "nodeSelector": { "node_group": "compute" },
+    "runtimeClassName": "nvidia"
   } } }, "description": "compute pod template" }
 JSON
 
@@ -66,7 +68,7 @@ curl -fsS -X POST "${H[@]}" "$BASE_URL/api/profile/settings" -d '{"pool":"defaul
 
 say "set data credential"
 curl -fsS -X POST "${H[@]}" "$BASE_URL/api/credentials/osmo" -d @- <<JSON >/dev/null
-{ "data_credential": { "access_key_id": "${S3_KEY_ID}", "access_key": "${S3_KEY}", "endpoint": "${S3_ENDPOINT}", "override_url": "${S3_OVERRIDE}", "region": "${S3_REGION}" } }
+{ "data_credential": { "access_key_id": "${S3_KEY_ID}", "access_key": "${S3_KEY}", "endpoint": "${S3_ENDPOINT}", "override_url": "${S3_OVERRIDE_HOST}", "region": "${S3_REGION}", "addressing_style": "path" } }
 JSON
 
 say "OSMO configuration complete."
