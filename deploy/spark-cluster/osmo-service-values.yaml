@@ -1,0 +1,76 @@
+# OSMO `service` chart values — dual-Spark k3s, minimal (no-auth, private LAN).
+# In-cluster Postgres + Redis + LocalStack-S3; no node_group selectors (2 real nodes).
+# Deploy: helm upgrade --install osmo-minimal ../../deployments/charts/service \
+#           -n osmo-minimal -f osmo-service-values.yaml
+global:
+  osmoImageLocation: nvcr.io/nvidia/osmo
+  osmoImageTag: latest
+  imagePullSecret: nvcr-secret
+  nodeSelector: {}
+  objectStorage:
+    endpoint: "s3://osmo"
+    overrideUrl: "http://localstack-s3:4566"
+    accessKeyId: "test"
+    accessKey: "test"
+    region: "us-east-1"
+
+services:
+  configFile:
+    enabled: true            # mount MEK from configmap mek-config
+  configs:
+    enabled: false           # DB-backed config; set storage/pools via osmo CLI post-deploy
+
+  # --- in-cluster data plane ---
+  postgres:
+    enabled: true
+    password: "osmo"         # must match db-secret/db-password
+    storageClassName: local-path
+  redis:
+    enabled: true
+    tlsEnabled: false        # in-cluster redis: no auth (redis-secret is empty)
+    storageClassName: local-path
+  localstackS3:
+    enabled: true
+    buckets: ["osmo"]
+    persistence:
+      enabled: true
+      storageClassName: local-path
+
+  # --- core services (single replica; point S3 SDK at localstack) ---
+  service:
+    scaling: {minReplicas: 1, maxReplicas: 1}
+    extraEnv: &s3env
+    - {name: AWS_ENDPOINT_URL_S3, value: "http://localstack-s3:4566"}
+    - {name: AWS_S3_FORCE_PATH_STYLE, value: "true"}
+    - {name: AWS_DEFAULT_REGION, value: "us-east-1"}
+  worker:
+    scaling: {minReplicas: 1, maxReplicas: 1}
+    extraEnv: *s3env
+  logger:
+    scaling: {minReplicas: 1, maxReplicas: 1}
+    extraEnv: *s3env
+  agent:
+    scaling: {minReplicas: 1, maxReplicas: 1}
+    extraEnv: *s3env
+  router:
+    scaling: {minReplicas: 1, maxReplicas: 1}
+  ui:
+    enabled: true
+    skipAuth: true
+    apiHostname: osmo-gateway.osmo-minimal.svc.cluster.local:80
+
+# --- gateway: no auth (private LAN). Inject default admin identity so the
+#     UI/API are usable without an IdP (oauth2Proxy + authz off). ---
+gateway:
+  oauth2Proxy:
+    enabled: false
+  authz:
+    enabled: false
+  envoy:
+    service:
+      type: NodePort
+      nodePort: 30080
+  defaultIdentity:
+    user: admin
+    roles: osmo-admin
+    allowedPools: default

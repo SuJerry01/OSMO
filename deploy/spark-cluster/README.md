@@ -21,15 +21,35 @@ simulated nodes). We abandoned it because:
 
 So: **k3s (real nodes) + GPU Operator + OSMO**, not KIND/nvkind/quick-start.
 
+## Status: ✅ DEPLOYED & VERIFIED (OSMO 6.3.0)
+
+- k3s 2-node cluster (both Sparks Ready, 0 restarts, `node_group=compute`)
+- GPU schedulable on both (`nvidia.com/gpu=1` each) via NVIDIA device plugin + `nvidia` runtimeclass
+- KAI Scheduler v0.14.0
+- OSMO control plane (`osmo-minimal`, 12 pods) + backend-operator (`osmo-operator`, 2 pods)
+- Pool `default` **ONLINE**, 2 GPU capacity; storage = in-cluster LocalStack-S3
+- **`verify-hello` workflow COMPLETED** end-to-end (KAI-scheduled to a compute node, images pulled from nvcr.io)
+
 ## Stages
 
 | Stage | File | Who | Status |
 |---|---|---|---|
-| 00 Clean old OSMO/k3s (both boxes) | (done inline; see git history) | sudo | a2a9 ✅ / 758e: run agent-uninstall |
-| 01 Build k3s 2-node | [`01-build-k3s-2node.md`](./01-build-k3s-2node.md) | sudo | pending |
-| 02 GPU Operator + KAI Scheduler | _tbd_ | AI (helm) | pending |
-| 03 Deploy OSMO (`--provider byo`) | _tbd_ | AI (helm/script) | pending |
-| 04 Verify (UI + verify-hello workflow) | _tbd_ | AI | pending |
+| 00 Clean old OSMO/k3s (both boxes) | git history | sudo | ✅ |
+| 01 Build k3s 2-node | [`01-build-k3s-2node.md`](./01-build-k3s-2node.md) | sudo | ✅ |
+| 02 OSMO layer (device plugin, KAI, secrets/MEK, service + backend-operator, config) | [`02-deploy-osmo.sh`](./02-deploy-osmo.sh) (non-sudo) | AI | ✅ |
+| ├─ service chart values | [`osmo-service-values.yaml`](./osmo-service-values.yaml) | | ✅ |
+| ├─ backend-operator values | [`osmo-backend-operator-values.yaml`](./osmo-backend-operator-values.yaml) | | ✅ |
+| └─ workflow storage/pool/creds config | [`03-configure-osmo.sh`](./03-configure-osmo.sh) | | ✅ |
+| 03 Verify | `osmo workflow submit ../../deployments/workflows/verify-hello.yaml` | AI | ✅ |
+
+## Access
+- **API / UI**: `http://localhost:30080` (gateway NodePort 30080; reachable on either node IP too). API check: `curl http://localhost:30080/api/version`.
+- **CLI** (userspace, no sudo): `~/bin/osmo` → `~/.local/osmo`. Login: `osmo login http://localhost:30080 --method=dev --username=testuser`.
+
+## Reproduce from scratch
+1. **[sudo]** build the cluster — `01-build-k3s-2node.md` (k3s server on a2a9 + agent on 758e over the 10.100.8.x interconnect), then `cp /etc/rancher/k3s/k3s.yaml ~/.kube/config`.
+2. **[non-sudo]** `./02-deploy-osmo.sh` — does device-plugin + node labels + KAI + secrets/MEK + service chart + CLI + backend-operator + storage config.
+3. Verify: `osmo workflow submit ../../deployments/workflows/verify-hello.yaml && osmo workflow list`.
 
 ## OSMO tier (decide at Stage 03)
 

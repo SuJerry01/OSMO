@@ -1,0 +1,23 @@
+# OSMO backend-operator (compute plane) — registers this k3s cluster as the
+# "default" compute backend so the default pool comes online and runs workflows.
+# Deploy: helm upgrade --install osmo-operator ../../deployments/charts/backend-operator \
+#           -n osmo-operator -f osmo-backend-operator-values.yaml
+global:
+  osmoImageLocation: nvcr.io/nvidia/osmo
+  osmoImageTag: latest
+  imagePullSecret: nvcr-secret
+  # control-plane gateway (service lives in osmo-minimal)
+  serviceUrl: http://osmo-gateway.osmo-minimal.svc.cluster.local
+  agentNamespace: osmo-operator        # where listener/worker run
+  backendNamespace: osmo-workflows     # where workflow pods are launched
+  backendName: default
+  accountTokenSecret: osmo-operator-token
+  accountTokenSecretKey: token
+  loginMethod: token
+
+backendTestRunner:
+  enabled: false
+
+sidecars:
+  otel:
+    enabled: false
